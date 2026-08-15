@@ -1,12 +1,13 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { streamText } from 'ai';
-import { ChatView, verifyEnv } from './utils.js';
+import initialMessages from './conversation.js';
+import { ChatView, verifyEnv, formatErrorMessage } from './utils.js';
 
-// Verify that environment variables are set
+// Verify environment variables
 verifyEnv();
-// Initialize OpenRouter client with API key
+
+// Initialize OpenRouter client with API key and model
 const openRouter = createOpenRouter({ apiKey: process.env.OPENROUTER_KEY });
-// Get current model and convert it to AI SDK compatible model
 const openRouterModel = openRouter(process.env.MODEL_ID);
 
 // Get UI Elements
@@ -17,14 +18,11 @@ const messagesContainer = document.getElementById("messages-container");
 const chatContainer = document.getElementById("chat-container");
 const personaSelector = document.getElementById("persona-selector");
 
-
-// Create chat view
+// Initialize chat view and message history
+const messages = [...initialMessages];
 const chatView = new ChatView(chatContainer, messagesContainer);
 
-// Conversation is initially empty
-const messages = [];
-
-// Define personas for the selector
+// Define personas for selector
 const personas = [
   { value: 'assistant', label: 'Assistant' },
   { value: 'eli5', label: 'ELI5' },
@@ -32,28 +30,34 @@ const personas = [
 ];
 
 function start() {
-
-  // Add options to Persona selector
-  personas.forEach(persona => {
-    const option = document.createElement("option");
-    option.value = persona.value;
-    option.textContent = persona.label;
-    personaSelector.appendChild(option);
+  // Render initial conversation history
+  messages.forEach(message => {
+    chatView.addMessage(message);
   });
+  
+  // Update initial message counters
+  chatView.updateCounters(messages);
 
-  // Handle user's message to the AI
+  // Populate persona selector if available in the DOM
+  if (personaSelector) {
+    personas.forEach(persona => {
+      const option = document.createElement("option");
+      option.value = persona.value;
+      option.textContent = persona.label;
+      personaSelector.appendChild(option);
+    });
+  }
+
+  // Handle user form submission
   chatForm.addEventListener("submit", handleUserMessage);
 }
 
 async function handleUserMessage(event) {
-
-  // Prevents default form submission
   event.preventDefault();
 
   // Exit if message is empty, otherwise disable input while loading
   const userInput = messageInput.value.trim();
   if (!userInput) return;
-
 
   messageInput.value = "";
   disableInputWhileLoading(true);
@@ -68,7 +72,7 @@ async function handleUserMessage(event) {
   messages.push(assistantMessage);
   chatView.addMessage(assistantMessage);
 
-
+  // Configure persona system prompts
   const systemPrompts = {
     assistant: `You are a helpful, polite, and versatile AI assistant. Answer queries clearly and accurately.`,
     eli5: `You explain complex concepts in extremely simple terms as if speaking to a 5-year-old. Use clear metaphors, simple words, and zero technical jargon.`,
@@ -78,26 +82,32 @@ async function handleUserMessage(event) {
   const selectedPersona = personaSelector ? personaSelector.value : "assistant";
   const selectedSystemPrompt = systemPrompts[selectedPersona] || systemPrompts.assistant;
 
+  // Trim context to the last 10 messages
+  const contextMessages = messages.slice(-10);
+  chatView.updateCounters(messages, contextMessages);
 
   try {
     const response = await streamText({
       model: openRouterModel,
       system: `${selectedSystemPrompt} No intros or conclusions. Instead of assuming, ask for clarification.`,
-      messages
+      messages: contextMessages
     });
 
-    // Update the assistant message as chunks arrive
-    for await (const textChunk of response.textStream) {
-      assistantMessage.content += textChunk;
-      chatView.updateLatestMessage(assistantMessage.content);
+    // Process stream events and text chunks
+    for await (const event of response.fullStream) {
+      if (event.type === 'error') {
+        throw event.error;
+      } else if (event.type === 'text-delta') {
+        assistantMessage.content += event.text;
+        chatView.updateLatestMessage(assistantMessage.content);
+      }
     }
-
   } catch (err) {
-    assistantMessage.content = `**Error:** ${err.message}`;
+    assistantMessage.content = formatErrorMessage(err);
     chatView.updateLatestMessage(assistantMessage.content);
   } finally {
-
     disableInputWhileLoading(false);
+    chatView.updateCounters(messages, contextMessages);
   }
 }
 
