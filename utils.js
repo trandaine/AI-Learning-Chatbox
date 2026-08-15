@@ -1,10 +1,11 @@
 import { marked } from "marked";
+import { encode } from 'gpt-tokenizer';
 import DOMPurify from "dompurify";
 
 export function verifyEnv() {
   if (!process.env.OPENROUTER_KEY) {
     console.error('❌ OPENROUTER_KEY env variable is not set');
-  } 
+  }
   if (!process.env.MODEL_ID) {
     console.error('❌ MODEL_ID env variable is not set');
   }
@@ -21,15 +22,36 @@ export function formatErrorMessage(error) {
   }
 }
 
+
+export function calculateTokens(messages) {
+  // Combine all message content
+  const allContent = messages.map(m => m.content).join();
+
+  // Use gpt-tokenizer to get token count
+  const tokens = encode(allContent);
+  return tokens.length;
+}
+
+
+export function printUsageData(usage, totalUsage) {
+  console.log('\n📈 Token Usage Report:');
+  console.log('   Last Step:', usage);
+  console.log('   Overall:', totalUsage);
+}
+
+
 export class ChatView {
   constructor(chatContainer, messagesContainer) {
     this.chatContainer = chatContainer;
     this.messagesContainer = messagesContainer;
     this.messageCount = 0;
     this.maxMessages = 20;
-    
+
     // Get counter elements from the chat container
-    this.totalMessagesCounter = chatContainer.querySelector('#total-messages-counter');
+    // this.totalMessagesCounter = chatContainer.querySelector('#total-messages-counter');
+    // this.contextMessagesCounter = chatContainer.querySelector('#context-messages-counter');
+
+    this.totalTokensCounter = chatContainer.querySelector('#total-tokens-counter');
     this.contextMessagesCounter = chatContainer.querySelector('#context-messages-counter');
   }
 
@@ -37,10 +59,10 @@ export class ChatView {
     const messageElement = this.createMessageElement(message);
     this.messagesContainer.appendChild(messageElement);
     this.messageCount++;
-    
+
     this.trimOldMessages();
-        this.scrollToBottom();
-    
+    this.scrollToBottom();
+
     return messageElement;
   }
 
@@ -93,10 +115,22 @@ export class ChatView {
   }
 
   updateCounters(allMessages, contextMessages = null) {
-    const totalCount = allMessages.length;
-    const contextCount = contextMessages ? contextMessages.length : totalCount;
-    
-    this.totalMessagesCounter.textContent = `${totalCount} total message${totalCount === 1 ? '' : 's'}`;
-    this.contextMessagesCounter.textContent = `${contextCount} context message${contextCount === 1 ? '' : 's'}`;
+    // const totalCount = allMessages.length;
+    // const contextCount = contextMessages ? contextMessages.length : totalCount;
+
+    // this.totalMessagesCounter.textContent = `${totalCount} total message${totalCount === 1 ? '' : 's'}`;
+    // this.contextMessagesCounter.textContent = `${contextCount} context message${contextCount === 1 ? '' : 's'}`;
+
+    const totalTokens = calculateTokens(allMessages);
+    const contextTokens = contextMessages ? calculateTokens(contextMessages) : totalTokens;
+
+    // this.totalTokensCounter.textContent = `${totalTokens} total tokens`;
+    // this.contextTokensCounter.textContent = `${contextTokens} context tokens`;
+    if (this.totalTokensCounter) {
+      this.totalTokensCounter.textContent = `${totalTokens} total token${totalTokens === 1 ? '' : 's'}`;
+    }
+    if (this.contextTokensCounter) {
+      this.contextTokensCounter.textContent = `${contextTokens} context token${contextTokens === 1 ? '' : 's'}`;
+    }
   }
 }

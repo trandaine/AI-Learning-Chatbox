@@ -12,21 +12,21 @@
   <div id="app">
     <main id="chat-container">
       <div id="messages-container"></div>
-      <div id="counters">
+      <!-- <div id="counters">
         <span id="total-messages-counter">0 total messages</span>
         <span class="separator">•</span>
         <span id="context-messages-counter">0 context messages</span>
+      </div> -->
+      <div id="counters">
+        <span id="total-tokens-counter">0 total tokens</span>
+        <span class="separator">•</span>
+        <span id="context-tokens-counter">0 context tokens</span>
       </div>
     </main>
 
     <footer>
       <form id="chat-form">
-        <input 
-          type="text" 
-          id="message-input" 
-          placeholder="Type a message..." 
-          autocomplete="off"
-        >
+        <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
         <button type="submit" id="send-button" aria-label="Send message">↑</button>
       </form>
 

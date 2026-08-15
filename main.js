@@ -1,7 +1,7 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { streamText } from 'ai';
 import initialMessages from './conversation.js';
-import { ChatView, verifyEnv, formatErrorMessage } from './utils.js';
+import { calculateTokens, ChatView, verifyEnv, formatErrorMessage } from './utils.js';
 
 // Verify environment variables
 verifyEnv();
@@ -52,6 +52,31 @@ function start() {
   chatForm.addEventListener("submit", handleUserMessage);
 }
 
+
+
+/**
+ * Keep removing the oldest messages from the conversation
+ * until the total token count is under maxTokens.
+ *
+ * @param {Array} messages - The array of conversation messages
+ * @param {number} tokenLimit - The maximum allowed token count
+ * @returns {Array} The trimmed messages array
+ */
+function getTrimmedContext(messages, tokenLimit) {
+  // Create a shallow copy so we don't mutate the original array
+  const trimmedMessages = [...messages];
+
+  // Remove the oldest message (index 0) while over the limit and keeping at least 1 message
+  while (trimmedMessages.length > 1 && calculateTokens(trimmedMessages) > tokenLimit) {
+    trimmedMessages.shift();
+  }
+
+  return trimmedMessages;
+}
+
+
+
+
 async function handleUserMessage(event) {
   event.preventDefault();
 
@@ -83,7 +108,13 @@ async function handleUserMessage(event) {
   const selectedSystemPrompt = systemPrompts[selectedPersona] || systemPrompts.assistant;
 
   // Trim context to the last 10 messages
-  const contextMessages = messages.slice(-10);
+  // const contextMessages = messages.slice(-10);
+
+  // Set max tokens for context trimming
+  const MAX_TOKENS = 20000;
+  const contextMessages = getTrimmedContext(messages, MAX_TOKENS);
+
+
   chatView.updateCounters(messages, contextMessages);
 
   try {

@@ -15,6 +15,7 @@
     "@openrouter/ai-sdk-provider": "^1.2.0",
     "ai": "^5.0.72",
     "dompurify": "^3.3.0",
+    "gpt-tokenizer": "^3.4.0",
     "marked": "^16.4.0"
   }
 }
